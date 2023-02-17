@@ -7,8 +7,12 @@ package io.flutter.plugins.webviewflutter;
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
 import android.graphics.Bitmap;
+import android.net.http.SslCertificate;
+import android.net.http.SslError;
 import android.os.Build;
+import android.util.Log;
 import android.view.KeyEvent;
+import android.webkit.SslErrorHandler;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
@@ -17,7 +21,14 @@ import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.webkit.WebResourceErrorCompat;
 import androidx.webkit.WebViewClientCompat;
+
+import java.lang.reflect.Field;
+import java.security.cert.X509Certificate;
 import java.util.Objects;
+
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
 
 /**
  * Host api implementation for {@link WebViewClient}.
@@ -28,11 +39,15 @@ public class WebViewClientHostApiImpl implements GeneratedAndroidWebView.WebView
   private final InstanceManager instanceManager;
   private final WebViewClientCreator webViewClientCreator;
   private final WebViewClientFlutterApiImpl flutterApi;
+  private final TrustManagerFactory tmf;
+
 
   /** Implementation of {@link WebViewClient} that passes arguments of callback methods to Dart. */
   @RequiresApi(Build.VERSION_CODES.N)
   public static class WebViewClientImpl extends WebViewClient {
     private final WebViewClientFlutterApiImpl flutterApi;
+    private final TrustManagerFactory tmf;
+
     private boolean returnValueForShouldOverrideUrlLoading = false;
 
     /**
@@ -40,8 +55,9 @@ public class WebViewClientHostApiImpl implements GeneratedAndroidWebView.WebView
      *
      * @param flutterApi handles sending messages to Dart
      */
-    public WebViewClientImpl(@NonNull WebViewClientFlutterApiImpl flutterApi) {
+    public WebViewClientImpl(@NonNull WebViewClientFlutterApiImpl flutterApi, TrustManagerFactory tmf) {
       this.flutterApi = flutterApi;
+      this.tmf = tmf;
     }
 
     @Override
@@ -57,6 +73,49 @@ public class WebViewClientHostApiImpl implements GeneratedAndroidWebView.WebView
     @Override
     public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
       flutterApi.onReceivedRequestError(this, view, request, error, reply -> {});
+    }
+
+
+    @Override
+    public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+      Log.d("WEB_VIEW_EXAMPLE", "onReceivedSslError");
+      if (tmf == null) {
+        handler.cancel();
+        return;
+      }
+      boolean passVerify = false;
+      if (error.getPrimaryError() == SslError.SSL_UNTRUSTED) {
+        SslCertificate cert = error.getCertificate();
+        String subjectDn = cert.getIssuedTo().getDName();
+        Log.d("WEB_VIEW_EXAMPLE", "subjectDN: " + subjectDn);
+        try {
+          Field f = cert.getClass().getDeclaredField("mX509Certificate");
+          f.setAccessible(true);
+          X509Certificate x509 = (X509Certificate) f.get(cert);
+          X509Certificate[] chain = new X509Certificate[]{x509};
+          for (TrustManager trustManager : tmf.getTrustManagers()) {
+            if (trustManager instanceof X509TrustManager) {
+              X509TrustManager x509TrustManager = (X509TrustManager) trustManager;
+              try {
+                x509TrustManager.checkServerTrusted(chain, "generic");
+                passVerify = true;
+                break;
+              } catch (Exception e) {
+                Log.e("WEB_VIEW_EXAMPLE", "verify trustManager failed" + e);
+                passVerify = false;
+              }
+            }
+          }
+          Log.d("WEB_VIEW_EXAMPLE", "passVerify: " + passVerify);
+        } catch (Exception e) {
+          Log.e("WEB_VIEW_EXAMPLE", "verify cert fail" + e);
+        }
+      }
+      if (passVerify) {
+        handler.proceed();
+      } else {
+        handler.cancel();
+      }
     }
 
     @Override
@@ -98,9 +157,12 @@ public class WebViewClientHostApiImpl implements GeneratedAndroidWebView.WebView
   public static class WebViewClientCompatImpl extends WebViewClientCompat {
     private final WebViewClientFlutterApiImpl flutterApi;
     private boolean returnValueForShouldOverrideUrlLoading = false;
+    private final TrustManagerFactory tmf;
 
-    public WebViewClientCompatImpl(@NonNull WebViewClientFlutterApiImpl flutterApi) {
+
+    public WebViewClientCompatImpl(@NonNull WebViewClientFlutterApiImpl flutterApi, TrustManagerFactory tmf) {
       this.flutterApi = flutterApi;
+      this.tmf = tmf;
     }
 
     @Override
@@ -147,6 +209,48 @@ public class WebViewClientHostApiImpl implements GeneratedAndroidWebView.WebView
     }
 
     @Override
+    public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+      Log.d("WEB_VIEW_EXAMPLE", "onReceivedSslError");
+      boolean passVerify = false;
+      if (tmf == null) {
+        handler.cancel();
+        return;
+      }
+      if (error.getPrimaryError() == SslError.SSL_UNTRUSTED) {
+        SslCertificate cert = error.getCertificate();
+        String subjectDn = cert.getIssuedTo().getDName();
+        Log.d("WEB_VIEW_EXAMPLE", "subjectDN: " + subjectDn);
+        try {
+          Field f = cert.getClass().getDeclaredField("mX509Certificate");
+          f.setAccessible(true);
+          X509Certificate x509 = (X509Certificate) f.get(cert);
+          X509Certificate[] chain = new X509Certificate[]{x509};
+          for (TrustManager trustManager : tmf.getTrustManagers()) {
+            if (trustManager instanceof X509TrustManager) {
+              X509TrustManager x509TrustManager = (X509TrustManager) trustManager;
+              try {
+                x509TrustManager.checkServerTrusted(chain, "generic");
+                passVerify = true;
+                break;
+              } catch (Exception e) {
+                Log.e("WEB_VIEW_EXAMPLE", "verify trustManager failed" + e);
+                passVerify = false;
+              }
+            }
+          }
+          Log.d("WEB_VIEW_EXAMPLE", "passVerify: " + passVerify);
+        } catch (Exception e) {
+          Log.e("WEB_VIEW_EXAMPLE", "verify cert fail" + e);
+        }
+      }
+      if (passVerify) {
+        handler.proceed();
+      } else {
+        handler.cancel();
+      }
+    }
+
+    @Override
     public void onUnhandledKeyEvent(WebView view, KeyEvent event) {
       // Deliberately empty. Occasionally the webview will mark events as having failed to be
       // handled even though they were handled. We don't want to propagate those as they're not
@@ -167,7 +271,7 @@ public class WebViewClientHostApiImpl implements GeneratedAndroidWebView.WebView
      * @param flutterApi handles sending messages to Dart
      * @return the created {@link WebViewClient}
      */
-    public WebViewClient createWebViewClient(WebViewClientFlutterApiImpl flutterApi) {
+    public WebViewClient createWebViewClient(WebViewClientFlutterApiImpl flutterApi, TrustManagerFactory tmf) {
       // WebViewClientCompat is used to get
       // shouldOverrideUrlLoading(WebView view, WebResourceRequest request)
       // invoked by the webview on older Android devices, without it pages that use iframes will
@@ -177,32 +281,33 @@ public class WebViewClientHostApiImpl implements GeneratedAndroidWebView.WebView
       // to bug https://bugs.chromium.org/p/chromium/issues/detail?id=925887. Also, see
       // https://github.com/flutter/flutter/issues/29446.
       if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-        return new WebViewClientImpl(flutterApi);
+        return new WebViewClientImpl(flutterApi, tmf);
       } else {
-        return new WebViewClientCompatImpl(flutterApi);
+        return new WebViewClientCompatImpl(flutterApi, tmf);
       }
     }
   }
 
   /**
    * Creates a host API that handles creating {@link WebViewClient}s.
-   *
-   * @param instanceManager maintains instances stored to communicate with Dart objects
+   *  @param instanceManager maintains instances stored to communicate with Dart objects
    * @param webViewClientCreator handles creating {@link WebViewClient}s
    * @param flutterApi handles sending messages to Dart
+   * @param tmf
    */
   public WebViewClientHostApiImpl(
-      InstanceManager instanceManager,
-      WebViewClientCreator webViewClientCreator,
-      WebViewClientFlutterApiImpl flutterApi) {
+          InstanceManager instanceManager,
+          WebViewClientCreator webViewClientCreator,
+          WebViewClientFlutterApiImpl flutterApi, TrustManagerFactory tmf) {
     this.instanceManager = instanceManager;
     this.webViewClientCreator = webViewClientCreator;
     this.flutterApi = flutterApi;
+    this.tmf = tmf;
   }
 
   @Override
   public void create(@NonNull Long instanceId) {
-    final WebViewClient webViewClient = webViewClientCreator.createWebViewClient(flutterApi);
+    final WebViewClient webViewClient = webViewClientCreator.createWebViewClient(flutterApi, tmf);
     instanceManager.addDartCreatedInstance(webViewClient, instanceId);
   }
 

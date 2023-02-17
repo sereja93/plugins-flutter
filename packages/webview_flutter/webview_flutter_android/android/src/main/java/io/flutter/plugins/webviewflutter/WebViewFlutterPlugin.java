@@ -6,9 +6,26 @@ package io.flutter.plugins.webviewflutter;
 
 import android.content.Context;
 import android.os.Handler;
+import android.util.Base64;
+import android.util.Log;
 import android.view.View;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
+import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.Reader;
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+import java.security.KeyStore;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
+
+import javax.net.ssl.TrustManagerFactory;
+
 import io.flutter.embedding.engine.plugins.FlutterPlugin;
 import io.flutter.embedding.engine.plugins.activity.ActivityAware;
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding;
@@ -72,6 +89,71 @@ public class WebViewFlutterPlugin implements FlutterPlugin, ActivityAware {
                 registrar.context().getAssets(), registrar));
   }
 
+  private InputStream fromPem(String pem) {
+    String base64cert = pemKeyContent(pem);
+    return fromBase64String(base64cert);
+  }
+
+  private InputStream fromBase64String(String base64cert) {
+    byte[] decoded = Base64.decode(base64cert, Base64.NO_WRAP);
+    return new ByteArrayInputStream(decoded);
+  }
+
+  private String pemKeyContent(String pem) {
+    return pem.replace("\\s+", "")
+            .replace("\n", "")
+            .replace("-----BEGIN PUBLIC KEY-----", "")
+            .replace("-----END PUBLIC KEY-----", "")
+            .replace("-----BEGIN CERTIFICATE-----", "")
+            .replace("-----END CERTIFICATE-----", "");
+  }
+
+  private InputStream readPemCert(String certName, Context context) {
+    return fromPem(getPemAsString(certName, context));
+  }
+
+  private String getPemAsString(String certName, Context context) {
+    InputStream ins = context.getResources().openRawResource(
+            context.getResources().getIdentifier(
+                    certName, "raw", context.getPackageName()));
+    StringBuilder textBuilder = new StringBuilder();
+    try (Reader reader = new BufferedReader(new InputStreamReader
+            (ins, Charset.forName(StandardCharsets.UTF_8.name())))) {
+      int c = 0;
+      while ((c = reader.read()) != -1) {
+        textBuilder.append((char) c);
+      }
+    } catch (IOException e) {
+      Log.d("WEB_VIEW_EXAMPLE", "read pem error");
+    }
+    return textBuilder.toString();
+  }
+
+
+
+  private TrustManagerFactory initTrustStore(Context context) throws Exception {
+    try {
+
+      String ROOT_CERTIFICATE = "root";
+      String SUB_CERTIFICATE = "sub";
+      CertificateFactory cf = CertificateFactory.getInstance("X.509");
+      InputStream subIns = readPemCert(SUB_CERTIFICATE, context);
+      Certificate sub = cf.generateCertificate(subIns);
+      InputStream rootIns = readPemCert(ROOT_CERTIFICATE, context);
+      Certificate root = cf.generateCertificate(rootIns);
+      KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+      keyStore.load(null, null);
+      keyStore.setCertificateEntry(SUB_CERTIFICATE, sub);
+      keyStore.setCertificateEntry(ROOT_CERTIFICATE, root);
+      String tmfAlgorithm = TrustManagerFactory.getDefaultAlgorithm();
+      TrustManagerFactory tmf = TrustManagerFactory.getInstance(tmfAlgorithm);
+      tmf.init(keyStore);
+      return tmf;
+    } catch (Exception e) {
+      throw new Exception("Error during TrustManagerFactory initialization");
+    }
+  }
+
   private void setUp(
       BinaryMessenger binaryMessenger,
       PlatformViewRegistry viewRegistry,
@@ -104,12 +186,20 @@ public class WebViewFlutterPlugin implements FlutterPlugin, ActivityAware {
     JavaObjectHostApi.setup(binaryMessenger, new JavaObjectHostApiImpl(instanceManager));
     WebViewHostApi.setup(binaryMessenger, webViewHostApi);
     JavaScriptChannelHostApi.setup(binaryMessenger, javaScriptChannelHostApi);
+
+    TrustManagerFactory tmf = null;
+    try {
+      tmf = initTrustStore(context);
+    } catch (Exception e) {
+      Log.d("WEB_VIEW_EXAMPLE", e.getMessage());
+    }
+
     WebViewClientHostApi.setup(
         binaryMessenger,
         new WebViewClientHostApiImpl(
             instanceManager,
             new WebViewClientHostApiImpl.WebViewClientCreator(),
-            new WebViewClientFlutterApiImpl(binaryMessenger, instanceManager)));
+            new WebViewClientFlutterApiImpl(binaryMessenger, instanceManager), tmf));
     WebChromeClientHostApi.setup(
         binaryMessenger,
         new WebChromeClientHostApiImpl(

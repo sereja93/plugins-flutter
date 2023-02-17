@@ -5,8 +5,10 @@
 package io.flutter.plugins.webviewflutter;
 
 import android.net.Uri;
+import android.net.http.SslError;
 import android.os.Build;
 import android.os.Message;
+import android.webkit.SslErrorHandler;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -124,6 +126,7 @@ public class WebChromeClientHostApiImpl implements WebChromeClientHostApi {
             @Override
             public boolean shouldOverrideUrlLoading(
                 @NonNull WebView windowWebView, @NonNull WebResourceRequest request) {
+
               if (!webViewClient.shouldOverrideUrlLoading(view, request)) {
                 view.loadUrl(request.getUrl().toString());
               }
@@ -136,6 +139,11 @@ public class WebChromeClientHostApiImpl implements WebChromeClientHostApi {
                 view.loadUrl(url);
               }
               return true;
+            }
+
+            @Override
+            public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+              webViewClient.onReceivedSslError(view, handler, error);
             }
           };
 

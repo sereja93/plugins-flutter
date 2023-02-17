@@ -134,7 +134,8 @@ Page resource error:
         },
       ))
       ..loadRequest(LoadRequestParams(
-        uri: Uri.parse('https://flutter.dev'),
+        // uri: Uri.parse('https://3dsecmt.sberbank.ru/payment/se/keys.do'),
+        uri: Uri.parse('http://www.sberbank.ru/ru/certificates'),
       ));
   }
 

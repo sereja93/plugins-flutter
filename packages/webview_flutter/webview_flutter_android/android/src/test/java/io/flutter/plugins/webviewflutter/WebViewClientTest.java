@@ -55,7 +55,7 @@ public class WebViewClientTest {
         };
 
     hostApiImpl =
-        new WebViewClientHostApiImpl(instanceManager, webViewClientCreator, mockFlutterApi);
+        new WebViewClientHostApiImpl(instanceManager, webViewClientCreator, mockFlutterApi, tmf);
     hostApiImpl.create(1L);
   }
 
@@ -118,7 +118,7 @@ public class WebViewClientTest {
                 return mockWebViewClient;
               }
             },
-            mockFlutterApi);
+            mockFlutterApi, tmf);
 
     instanceManager.addDartCreatedInstance(mockWebViewClient, 0);
     webViewClientHostApi.setSynchronousReturnValueForShouldOverrideUrlLoading(0L, false);

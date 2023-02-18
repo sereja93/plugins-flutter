@@ -20,3 +20,4 @@
 #import <webview_flutter_wkwebview/FWFWebViewFlutterWKWebViewExternalAPI.h>
 #import <webview_flutter_wkwebview/FWFWebViewHostApi.h>
 #import <webview_flutter_wkwebview/FWFWebsiteDataStoreHostApi.h>
+#import <webview_flutter_wkwebview/webview_flutter_wkwebview-Swift.h>

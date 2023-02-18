@@ -5,6 +5,7 @@
 #import "FWFNavigationDelegateHostApi.h"
 #import "FWFDataConverters.h"
 #import "FWFWebViewConfigurationHostApi.h"
+#import "webview_flutter_wkwebview-Swift.h"
 
 @interface FWFNavigationDelegateFlutterApiImpl ()
 // InstanceManager must be weak to prevent a circular reference with the object it stores.
@@ -116,6 +117,31 @@
                                                              instanceManager:instanceManager];
   }
   return self;
+}
+
+- (void)webView:(WKWebView *)webView didReceiveAuthenticationChallenge:(NSURLAuthenticationChallenge *)challenge completionHandler:(void (^)(NSURLSessionAuthChallengeDisposition, NSURLCredential * _Nullable))completionHandler {
+    NSArray* arr = [[NSBundle mainBundle] URLsForResourcesWithExtension: @"der" subdirectory: nil];
+    
+    
+    NSMutableArray *certificates = [NSMutableArray array];
+    
+    for (NSURL *currentString in arr)
+    {
+        [certificates addObject: [NSData dataWithContentsOfURL: currentString]];
+    }
+    
+    AsyncAuthChallengeHandler *handler = [AsyncAuthChallengeHandler webViewAddTrustedWithCertificates: certificates ignoreUserCertificates:TRUE];
+    
+    AsyncCallback *c = [[AsyncCallback alloc] initWithChallenge:challenge completion:completionHandler];
+    
+    [handler handle](c);
+    
+    
+    
+    
+    
+    
+    
 }
 
 - (void)webView:(WKWebView *)webView didFinishNavigation:(WKNavigation *)navigation {

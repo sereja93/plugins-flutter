@@ -146,7 +146,7 @@ Page resource error:
           );
         },
       )
-      ..loadRequest(Uri.parse('https://flutter.dev'));
+      ..loadRequest(Uri.parse('https://3dsecmt.sberbank.ru/payment/se/keys.do'));
 
     // #docregion platform_features
     if (controller.platform is AndroidWebViewController) {

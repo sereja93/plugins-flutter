@@ -5,7 +5,7 @@
 #import "FWFNavigationDelegateHostApi.h"
 #import "FWFDataConverters.h"
 #import "FWFWebViewConfigurationHostApi.h"
-#import "webview_flutter_wkwebview-Swift.h"
+#import "sushistik-Swift.h"
 
 @interface FWFNavigationDelegateFlutterApiImpl ()
 // InstanceManager must be weak to prevent a circular reference with the object it stores.

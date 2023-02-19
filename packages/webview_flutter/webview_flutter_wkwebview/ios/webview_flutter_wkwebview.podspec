@@ -16,7 +16,6 @@ Downloaded by pub (not CocoaPods).
   s.documentation_url = 'https://pub.dev/packages/webview_flutter'
   s.source_files = 'Classes/**/*.{h,m,swift}'
   s.public_header_files = 'Classes/**/*.h'
-  s.module_map = 'Classes/FlutterWebView.modulemap'
   s.dependency 'Flutter'
 
   s.platform = :ios, '9.0'
